@@ -19,14 +19,16 @@ from encoding.parallel import DataParallelModel, DataParallelCriterion
 from encoding.datasets import get_segmentation_dataset, test_batchify_fn
 from encoding.models import get_model, get_segmentation_model, MultiEvalModule
 
-from option import Options
+from danet.option import Options
+
 torch_ver = torch.__version__[:3]
 if torch_ver == '0.3':
     from torch.autograd import Variable
 
+
 def test(args):
     # output folder
-    outdir = '%s/danet_vis'%(args.dataset)
+    outdir = '%s/danet_vis' % (args.dataset)
     if not os.path.exists(outdir):
         os.makedirs(outdir)
     # data transforms
@@ -37,7 +39,7 @@ def test(args):
     if args.eval:
         testset = get_segmentation_dataset(args.dataset, split='val', mode='testval',
                                            transform=input_transform)
-    else:#set split='test' for test set
+    else:  # set split='test' for test set
         testset = get_segmentation_dataset(args.dataset, split='val', mode='vis',
                                            transform=input_transform)
     # dataloader
@@ -56,7 +58,7 @@ def test(args):
                                        multi_grid=args.multi_grid, multi_dilation=args.multi_dilation)
         # resuming checkpoint
         if args.resume is None or not os.path.isfile(args.resume):
-            raise RuntimeError("=> no checkpoint found at '{}'" .format(args.resume))
+            raise RuntimeError("=> no checkpoint found at '{}'".format(args.resume))
         checkpoint = torch.load(args.resume)
         # strict=False, so that it is compatible with old pytorch saved models
         model.load_state_dict(checkpoint['state_dict'], strict=False)
@@ -67,12 +69,13 @@ def test(args):
     evaluator.eval()
 
     tbar = tqdm(test_data)
+
     def eval_batch(image, dst, evaluator, eval_mode):
         if eval_mode:
             # evaluation mode on validation set
             targets = dst
             outputs = evaluator.parallel_forward(image)
-            
+
             batch_inter, batch_union, batch_correct, batch_label = 0, 0, 0, 0
             for output, target in zip(outputs, targets):
                 correct, labeled = utils.batch_pix_accuracy(output.data.cpu(), target)
@@ -105,18 +108,19 @@ def test(args):
         else:
             with torch.no_grad():
                 correct, labeled, inter, union = eval_batch(image, dst, evaluator, args.eval)
-        pixAcc, mIoU, IoU = 0， 0， 0
+        pixacc, miou, iou = 0, 0, 0
         if args.eval:
             total_correct += correct.astype('int64')
             total_label += labeled.astype('int64')
             total_inter += inter.astype('int64')
             total_union += union.astype('int64')
-            pixAcc = np.float64(1.0) * total_correct / (np.spacing(1, dtype=np.float64) + total_label)
-            IoU = np.float64(1.0) * total_inter / (np.spacing(1, dtype=np.float64) + total_union)
-            mIoU = IoU.mean()
+            pixacc = np.float64(1.0) * total_correct / (np.spacing(1, dtype=np.float64) + total_label)
+            iou = np.float64(1.0) * total_inter / (np.spacing(1, dtype=np.float64) + total_union)
+            miou = iou.mean()
             tbar.set_description(
-                'pixAcc: %.4f, mIoU: %.4f' % (pixAcc, mIoU))
-    return pixAcc, mIoU, IoU, num_class
+                'pixacc: %.4f, miou: %.4f' % (pixacc, miou))
+    return pixacc, miou, iou, num_class
+
 
 def eval_multi_models(args):
     if args.resume_dir is None or not os.path.isdir(args.resume_dir):
@@ -128,25 +132,26 @@ def eval_multi_models(args):
             if not args.eval:
                 test(args)
                 continue
-            pixAcc, mIoU, IoU, num_class = test(args)
-        
+            pixacc, miou, iou, num_class = test(args)
+
             txtfile = args.resume
             txtfile = txtfile.replace('pth.tar', 'txt')
             if not args.multi_scales:
-                txtfile = txtfile.replace('.txt', 'result_mIoU_%.4f.txt'%mIoU)
+                txtfile = txtfile.replace('.txt', 'result_miou_%.4f.txt' % miou)
             else:
-                txtfile = txtfile.replace('.txt', 'multi_scale_result_mIoU_%.4f.txt'%mIoU)
+                txtfile = txtfile.replace('.txt', 'multi_scale_result_miou_%.4f.txt' % miou)
             fh = open(txtfile, 'w')
-            print("================ Summary IOU ================\n")
-            for i in range(0,num_class):
-                print("%3d: %.4f\n" %(i,IoU[i]))
-                fh.write("%3d: %.4f\n" %(i,IoU[i]))
-            print("Mean IoU over %d classes: %.4f\n" % (num_class, mIoU))
-            print("Pixel-wise Accuracy: %2.2f%%\n" % (pixAcc * 100))
-            fh.write("Mean IoU over %d classes: %.4f\n" % (num_class, mIoU))
-            fh.write("Pixel-wise Accuracy: %2.2f%%\n" % (pixAcc * 100))
+            print("================ Summary iou ================\n")
+            for i in range(0, num_class):
+                print("%3d: %.4f\n" % (i, iou[i]))
+                fh.write("%3d: %.4f\n" % (i, iou[i]))
+            print("Mean iou over %d classes: %.4f\n" % (num_class, miou))
+            print("Pixel-wise Accuracy: %2.2f%%\n" % (pixacc * 100))
+            fh.write("Mean iou over %d classes: %.4f\n" % (num_class, miou))
+            fh.write("Pixel-wise Accuracy: %2.2f%%\n" % (pixacc * 100))
             fh.close()
     print('Evaluation is finished!!!')
+
 
 if __name__ == "__main__":
     args = Options().parse()
