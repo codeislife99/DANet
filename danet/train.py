@@ -5,7 +5,6 @@
 ###########################################################################
 
 import os
-import copy
 import numpy as np
 from tqdm import tqdm
 
@@ -15,21 +14,20 @@ import torchvision.transforms as transform
 from torch.nn.parallel.scatter_gather import gather
 
 import encoding.utils as utils
-from encoding.nn import SegmentationLosses,BatchNorm2d
+from encoding.nn import SegmentationLosses, BatchNorm2d
 from encoding.nn import SegmentationMultiLosses
 from encoding.parallel import DataParallelModel, DataParallelCriterion
 from encoding.datasets import get_segmentation_dataset
 from encoding.models import get_segmentation_model
 
-
-from option import Options
-
+from danet.option import Options
 
 torch_ver = torch.__version__[:3]
 if torch_ver == '0.3':
     from torch.autograd import Variable
 
-class Trainer():
+
+class Trainer:
     def __init__(self, args):
         self.args = args
         args.log_name = str(args.checkname)
@@ -62,20 +60,20 @@ class Trainer():
                                        base_size=args.base_size, crop_size=args.crop_size,
                                        multi_grid=args.multi_grid,
                                        multi_dilation=args.multi_dilation)
-        #print(model)
+        # print(model)
         self.logger.info(model)
         # optimizer using different LR
-        params_list = [{'params': model.pretrained.parameters(), 'lr': args.lr},]
+        params_list = [{'params': model.pretrained.parameters(), 'lr': args.lr}, ]
         if hasattr(model, 'head'):
-            params_list.append({'params': model.head.parameters(), 'lr': args.lr*10})
+            params_list.append({'params': model.head.parameters(), 'lr': args.lr * 10})
         if hasattr(model, 'auxlayer'):
-            params_list.append({'params': model.auxlayer.parameters(), 'lr': args.lr*10})
+            params_list.append({'params': model.auxlayer.parameters(), 'lr': args.lr * 10})
         optimizer = torch.optim.SGD(params_list,
-                    lr=args.lr,
-                    momentum=args.momentum,
-                    weight_decay=args.weight_decay)
+                                    lr=args.lr,
+                                    momentum=args.momentum,
+                                    weight_decay=args.weight_decay)
         self.criterion = SegmentationMultiLosses(nclass=self.nclass)
-        #self.criterion = SegmentationLosses(se_loss=args.se_loss, aux=args.aux,nclass=self.nclass)
+        # self.criterion = SegmentationLosses(se_loss=args.se_loss, aux=args.aux,nclass=self.nclass)
 
         self.model, self.optimizer = model, optimizer
         # using cuda
@@ -94,7 +92,7 @@ class Trainer():
         # resuming checkpoint
         if args.resume:
             if not os.path.isfile(args.resume):
-                raise RuntimeError("=> no checkpoint found at '{}'" .format(args.resume))
+                raise RuntimeError("=> no checkpoint found at '{}'".format(args.resume))
             checkpoint = torch.load(args.resume)
             args.start_epoch = checkpoint['epoch']
             if args.cuda:
@@ -132,7 +130,7 @@ class Trainer():
 
         if self.args.no_val:
             # save checkpoint every 10 epoch
-            filename = "checkpoint_%s.pth.tar"%(epoch+1)
+            filename = "checkpoint_%s.pth.tar" % (epoch + 1)
             is_best = False
             if epoch > 99:
                 if not epoch % 5:
@@ -141,8 +139,7 @@ class Trainer():
                         'state_dict': self.model.module.state_dict(),
                         'optimizer': self.optimizer.state_dict(),
                         'best_pred': self.best_pred,
-                        }, self.args, is_best, filename)
-
+                    }, self.args, is_best, filename)
 
     def validation(self, epoch):
         # Fast test during the training
@@ -172,14 +169,14 @@ class Trainer():
             total_label += labeled
             total_inter += inter
             total_union += union
-            pixAcc = 1.0 * total_correct / (np.spacing(1) + total_label)
-            IoU = 1.0 * total_inter / (np.spacing(1) + total_union)
-            mIoU = IoU.mean()
+            pixacc = 1.0 * total_correct / (np.spacing(1) + total_label)
+            iou = 1.0 * total_inter / (np.spacing(1) + total_union)
+            miou = iou.mean()
             tbar.set_description(
-                'pixAcc: %.3f, mIoU: %.3f' % (pixAcc, mIoU))
-        self.logger.info('pixAcc: %.3f, mIoU: %.3f' % (pixAcc, mIoU))
+                'pixacc: %.3f, miou: %.3f' % (pixacc, miou))
+        self.logger.info('pixacc: %.3f, miou: %.3f' % (pixacc, miou))
 
-        new_pred = (pixAcc + mIoU) / 2
+        new_pred = (pixacc + miou) / 2
         if new_pred > self.best_pred:
             is_best = True
             self.best_pred = new_pred
@@ -189,6 +186,7 @@ class Trainer():
                 'optimizer': self.optimizer.state_dict(),
                 'best_pred': self.best_pred,
             }, self.args, is_best)
+
 
 if __name__ == "__main__":
     args = Options().parse()

@@ -8,6 +8,7 @@ import os
 import argparse
 import torch
 
+
 class Options():
     def __init__(self):
         parser = argparse.ArgumentParser(description='PyTorch \
@@ -31,9 +32,9 @@ class Options():
                             help='crop image size')
         # training hyper params
 
-        parser.add_argument('--aux', action='store_true', default= False,
+        parser.add_argument('--aux', action='store_true', default=False,
                             help='Auxilary Loss')
-        parser.add_argument('--se-loss', action='store_true', default= False,
+        parser.add_argument('--se-loss', action='store_true', default=False,
                             help='Semantic Encoding Loss SE-loss')
         parser.add_argument('--epochs', type=int, default=None, metavar='N',
                             help='number of epochs to train (default: auto)')
@@ -58,7 +59,7 @@ class Options():
                             metavar='M', help='w-decay (default: 1e-4)')
         # cuda, seed and logging
         parser.add_argument('--no-cuda', action='store_true', default=
-                            False, help='disables CUDA training')
+        False, help='disables CUDA training')
         parser.add_argument('--seed', type=int, default=1, metavar='S',
                             help='random seed (default: 1)')
         parser.add_argument('--log-root', type=str,
@@ -74,7 +75,7 @@ class Options():
         parser.add_argument('--model-zoo', type=str, default=None,
                             help='evaluating on model zoo model')
         # finetuning pre-trained models
-        parser.add_argument('--ft', action='store_true', default= False,
+        parser.add_argument('--ft', action='store_true', default=False,
                             help='finetuning on a different dataset')
         parser.add_argument('--ft-resume', type=str, default=None,
                             help='put the path of trained model to finetune if needed ')
@@ -83,16 +84,16 @@ class Options():
                             (default: None)')
 
         # evaluation option
-        parser.add_argument('--ema', action='store_true', default= False,
+        parser.add_argument('--ema', action='store_true', default=False,
                             help='using EMA evaluation')
-        parser.add_argument('--eval', action='store_true', default= False,
+        parser.add_argument('--eval', action='store_true', default=False,
                             help='evaluating mIoU')
-        parser.add_argument('--no-val', action='store_true', default= False,
+        parser.add_argument('--no-val', action='store_true', default=False,
                             help='skip validation during training')
         # test option
         parser.add_argument('--test-folder', type=str, default=None,
                             help='path to test image folder')
-        parser.add_argument('--multi-scales',action="store_true", default=False,
+        parser.add_argument('--multi-scales', action="store_true", default=False,
                             help="testing scale,default:1.0(single scale)")
         # multi grid dilation option
         parser.add_argument("--multi-grid", action="store_true", default=False,
@@ -100,7 +101,7 @@ class Options():
         parser.add_argument('--multi-dilation', nargs='+', type=int, default=None,
                             help="multi grid dilation list")
         parser.add_argument('--scale', action='store_false', default=True,
-                           help='choose to use random scale transform(0.75-2),default:multi scale')
+                            help='choose to use random scale transform(0.75-2),default:multi scale')
         # the parser
         self.parser = parser
 
