@@ -20,6 +20,7 @@ from ..functions import scaledL2, aggregate, pairwise_cosine
 
 __all__ = ['Encoding', 'EncodingDrop', 'Inspiration', 'UpsampleConv2d']
 
+
 class Encoding(Module):
     r"""
     Encoding Layer: a learnable residual encoder.
