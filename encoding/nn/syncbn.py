@@ -23,10 +23,10 @@ from ..functions import *
 from ..parallel import allreduce
 from .comm import SyncMaster
 
-
 __all__ = ['BatchNorm1d', 'BatchNorm2d', 'BatchNorm3d', 'Module', 'Sequential', 'Conv1d',
            'Conv2d', 'ConvTranspose2d', 'ReLU', 'Sigmoid', 'MaxPool2d', 'AvgPool2d',
            'AdaptiveAvgPool2d', 'Dropout2d', 'Linear']
+
 
 class _SyncBatchNorm(_BatchNorm):
     def __init__(self, num_features, eps=1e-5, momentum=0.1, affine=True):
@@ -56,7 +56,7 @@ class _SyncBatchNorm(_BatchNorm):
         else:
             mean, inv_std = self._slave_pipe.run_slave(_ChildMessage(xsum, xsqsum, N))
         # forward
-        return batchnormtrain(input, mean, 1.0/inv_std, self.weight, self.bias).view(input_shape)
+        return batchnormtrain(input, mean, 1.0 / inv_std, self.weight, self.bias).view(input_shape)
 
     def __data_parallel_replicate__(self, ctx, copy_id):
         self._parallel_id = copy_id
@@ -86,7 +86,7 @@ class _SyncBatchNorm(_BatchNorm):
 
         outputs = []
         for i, rec in enumerate(intermediates):
-            outputs.append((rec[0], _MasterMessage(*broadcasted[i*2:i*2+2])))
+            outputs.append((rec[0], _MasterMessage(*broadcasted[i * 2:i * 2 + 2])))
 
         return outputs
 
@@ -112,6 +112,7 @@ _MasterMessage = collections.namedtuple('_MasterMessage', ['sum', 'inv_std'])
 
 class BatchNorm1d(_SyncBatchNorm):
     r"""Please see the docs in :class:`encoding.nn.BatchNorm2d`"""
+
     def _check_input_dim(self, input):
         if input.dim() != 2 and input.dim() != 3:
             raise ValueError('expected 2D or 3D input (got {}D input)'
@@ -172,6 +173,7 @@ class BatchNorm2d(_SyncBatchNorm):
         >>> encoding.parallel.patch_replication_callback(net)
         >>> output = net(input)
     """
+
     def _check_input_dim(self, input):
         if input.dim() != 4:
             raise ValueError('expected 4D input (got {}D input)'
@@ -181,6 +183,7 @@ class BatchNorm2d(_SyncBatchNorm):
 
 class BatchNorm3d(_SyncBatchNorm):
     r"""Please see the docs in :class:`encoding.nn.BatchNorm2d`"""
+
     def _check_input_dim(self, input):
         if input.dim() != 5:
             raise ValueError('expected 5D input (got {}D input)'
@@ -190,6 +193,7 @@ class BatchNorm3d(_SyncBatchNorm):
 
 class SharedTensor(object):
     """Shared Tensor for cross GPU all reduce operation"""
+
     def __init__(self, nGPUs):
         self.mutex = threading.Lock()
         self.all_tasks_done = threading.Condition(self.mutex)
@@ -210,7 +214,7 @@ class SharedTensor(object):
             self.N += inputs[0]
             igpu = inputs[1]
             self.dict[igpu] = inputs[2:]
-            #idx = self.nGPUs - self.push_tasks
+            # idx = self.nGPUs - self.push_tasks
             self.push_tasks -= 1
         with self.all_tasks_done:
             if self.push_tasks == 0:
@@ -222,7 +226,7 @@ class SharedTensor(object):
         # pull from device
         with self.mutex:
             if igpu == 0:
-                assert(len(self.dict) == self.nGPUs)
+                assert (len(self.dict) == self.nGPUs)
                 # flatten the tensors
                 self.list = [t for i in range(len(self.dict)) for t in self.dict[i]]
                 self.outlist = allreduce(2, *self.list)
@@ -235,11 +239,10 @@ class SharedTensor(object):
             while self.reduce_tasks:
                 self.all_tasks_done.wait()
         # all reduce done
-        return self.N, self.outlist[2*igpu], self.outlist[2*igpu+1]
+        return self.N, self.outlist[2 * igpu], self.outlist[2 * igpu + 1]
 
     def __len__(self):
         return self.nGPUs
 
     def __repr__(self):
         return ('SharedTensor')
-

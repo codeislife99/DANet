@@ -6,6 +6,7 @@ from .psp import *
 from .encnet import *
 from .danet import *
 
+
 def get_segmentation_model(name, **kwargs):
     from .fcn import get_fcn
     models = {

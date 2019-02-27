@@ -1,19 +1,81 @@
-###########################################################################
-# Created by: CASIA IVA 
-# Email: jliu@nlpr.ia.ac.cn
-# Copyright (c) 2018
-###########################################################################
-from __future__ import division
-import os
+import torch
+from torch.nn import Module, Sequential, Conv2d, ReLU, AdaptiveAvgPool2d, \
+    NLLLoss, BCELoss, CrossEntropyLoss, AvgPool2d, MaxPool2d, Parameter
+import math
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.nn.functional import upsample, normalize
-from ..nn import PAM_Module
-from ..nn import CAM_Module
-from ..models import BaseNet
+import torch.nn.functional as F
+from torch.nn.functional import upsample
+from torch.nn.parallel.data_parallel import DataParallel
+from torch.nn.parallel.parallel_apply import parallel_apply
+from torch.nn.parallel.scatter_gather import scatter
 
-__all__ = ['DANet', 'get_danet']
+class TripleCrossEntropyLoss(torch.nn.CrossEntropyLoss):
+    """2D Cross Entropy Loss with Multi-L1oss
+
+    from https://github.com/junfu1115/DANet/blob/master/encoding/nn/customize.py """
+
+    def __init__(self, nclass=-1, weight=None, size_average=True, ignore_index=-1):
+        super(TripleCrossEntropyLoss, self).__init__(weight, size_average, ignore_index)
+        self.nclass = nclass
+
+    def forward(self, outputs, targets):
+        # type: (torch.FloatTensor, torch.LongTensor) -> torch.Tensor
+        """
+        :param outputs: N X C X H X W
+        :param targets: N X H X W
+        :return: loss
+        """
+        pred1, pred2, pred3 = tuple(outputs)
+        loss1 = super(TripleCrossEntropyLoss, self).forward(pred1, targets)
+        loss2 = super(TripleCrossEntropyLoss, self).forward(pred2, targets)
+        loss3 = super(TripleCrossEntropyLoss, self).forward(pred3, targets)
+        loss = loss1 + loss2 + loss3
+        return loss
+
+
+class BaseNet(nn.Module):
+    def __init__(self, nclass, backbone, aux, se_loss, dilated=True, norm_layer=None,
+                 base_size=576, crop_size=608, mean=[.485, .456, .406],
+                 std=[.229, .224, .225], root='./pretrain_models',
+                 multi_grid=False, multi_dilation=None):
+        super(BaseNet, self).__init__()
+        self.nclass = nclass
+        self.aux = aux
+        self.se_loss = se_loss
+        self.mean = mean
+        self.std = std
+        self.base_size = base_size
+        self.crop_size = crop_size
+        # copying modules from pretrained models
+        if backbone == 'resnet50':
+            self.pretrained = resnet.resnet50(pretrained=True, dilated=dilated,
+                                              norm_layer=norm_layer, root=root,
+                                              multi_grid=multi_grid, multi_dilation=multi_dilation)
+        elif backbone == 'resnet101':
+            self.pretrained = resnet.resnet101(pretrained=True, dilated=dilated,
+                                               norm_layer=norm_layer, root=root,
+                                               multi_grid=multi_grid, multi_dilation=multi_dilation)
+        elif backbone == 'resnet152':
+            self.pretrained = resnet.resnet152(pretrained=True, dilated=dilated,
+                                               norm_layer=norm_layer, root=root,
+                                               multi_grid=multi_grid, multi_dilation=multi_dilation)
+        else:
+            raise RuntimeError('unknown backbone: {}'.format(backbone))
+        # bilinear upsample options
+        self._up_kwargs = up_kwargs
+
+    def base_forward(self, x):
+        x = self.pretrained.conv1(x)
+        x = self.pretrained.bn1(x)
+        x = self.pretrained.relu(x)
+        x = self.pretrained.maxpool(x)
+        c1 = self.pretrained.layer1(x)
+        c2 = self.pretrained.layer2(c1)
+        c3 = self.pretrained.layer3(c2)
+        c4 = self.pretrained.layer4(c3)
+        return c1, c2, c3, c4
 
 
 class DANet(BaseNet):
@@ -125,3 +187,12 @@ def get_danet(dataset='pascal_voc', backbone='resnet50', pretrained=False,
             get_model_file('fcn_%s_%s' % (backbone, acronyms[dataset]), root=root)),
             strict=False)
     return model
+
+
+if __name__ == '__main__':
+    a = torch.randn((2, 3, 4, 5))
+    b = torch.ones((2, 4, 5)).long()
+    ce_loss = F.cross_entropy(a, b)
+    print(ce_loss.item())
+    se_loss = TripleCrossEntropyLoss()
+    print(se_loss([a, a, a], b))
